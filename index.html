@@ -8,12 +8,19 @@
 body{width:100vw;height:100vh;overflow:hidden;font-family:'Georgia','Times New Roman',serif;background:#1a5a8a}
 
 .scene{position:fixed;inset:0;overflow:hidden}
+.water-layer{position:absolute;inset:0;z-index:0;filter:url(#waterWave)}
 
 /* Background image */
 .bg{position:absolute;inset:0;background-size:cover;background-position:center;background-repeat:no-repeat;transition:opacity 1s;z-index:0}
 .bg-main{background-image:url('https://i.ibb.co/zVR70pXd/Chat-GPT-Image-Mar-17-2026-05-10-12-PM-2.png')}
 .bg-final{background-image:url('https://i.ibb.co/fbKwgT0/Chat-GPT-Image-Mar-17-2026-05-10-12-PM-2-1.png');opacity:0}
 .bg-final.show{opacity:1}
+
+/* Water ripple canvas overlay */
+.water-ripple-canvas{
+  position:absolute;inset:0;z-index:1;pointer-events:none;
+  opacity:0.12;mix-blend-mode:overlay;
+}
 
 /* ===== BANNER using hosted image ===== */
 .banner{
@@ -154,9 +161,28 @@ body{width:100vw;height:100vh;overflow:hidden;font-family:'Georgia','Times New R
 </head>
 <body>
 
+<!-- SVG Gaussian water distortion filter -->
+<svg style="position:absolute;width:0;height:0">
+  <defs>
+    <filter id="waterWave" x="-5%" y="-5%" width="110%" height="110%">
+      <!-- Primary large wave distortion -->
+      <feTurbulence id="waveTurb" type="fractalNoise" baseFrequency="0.01 0.014" numOctaves="2" seed="2" result="bigWave"/>
+      <feDisplacementMap in="SourceGraphic" in2="bigWave" scale="8" xChannelSelector="R" yChannelSelector="G" result="displaced"/>
+      <!-- Secondary fine ripple layer -->
+      <feTurbulence id="waveTurb2" type="turbulence" baseFrequency="0.02 0.035" numOctaves="2" seed="7" result="fineRipple"/>
+      <feDisplacementMap in="displaced" in2="fineRipple" scale="4" xChannelSelector="G" yChannelSelector="B" result="doubleDisplaced"/>
+      <!-- Gentle Gaussian blur to blend -->
+      <feGaussianBlur in="doubleDisplaced" stdDeviation="0.4"/>
+    </filter>
+  </defs>
+</svg>
+
 <div class="scene" id="scene">
-  <div class="bg bg-main" id="bgMain"></div>
-  <div class="bg bg-final" id="bgFinal"></div>
+  <div class="water-layer">
+    <div class="bg bg-main" id="bgMain"></div>
+    <div class="bg bg-final" id="bgFinal"></div>
+    <canvas class="water-ripple-canvas" id="rippleCanvas"></canvas>
+  </div>
 
   <!-- Banner with hosted assets -->
   <div class="banner" id="banner">
@@ -242,30 +268,33 @@ function getStoneSize(){
 function getPositions(){
   const W=window.innerWidth,H=window.innerHeight;
   const sw=getStoneSize(),sh=sw/1.35;
-  const padT=100,padB=60,padL=30,padR=30;
-  // 3 rows x 2 cols layout, well spaced
-  const usableW=W-padL-padR-sw;
-  const usableH=H-padT-padB-sh;
-  const cols=3,rows=2;
-  const gapX=usableW/(cols-1);
-  const gapY=usableH/(rows-1);
+  // Centre vertical strip to avoid (where path stones go)
+  const centreL=W/2-sw*1.2, centreR=W/2+sw*1.2;
+  const padT=140,padB=80;
   const positions=[];
-  // Row 0: 3 stones across top area
-  // Row 1: 3 stones across bottom area
-  // Stagger for natural look
-  const offsets=[
-    {r:0,c:0,ox:0.08,oy:0.05},
-    {r:0,c:1,ox:0,oy:-0.02},
-    {r:0,c:2,ox:-0.06,oy:0.04},
-    {r:1,c:0,ox:0.05,oy:-0.03},
-    {r:1,c:1,ox:0,oy:0.02},
-    {r:1,c:2,ox:-0.04,oy:-0.04},
+  // 6 slots: 3 on left half, 3 on right half, scattered vertically
+  // Left side slots
+  const leftSlots=[
+    {xMin:W*0.06, xMax:centreL-sw, yMin:padT, yMax:H*0.35},
+    {xMin:W*0.04, xMax:centreL-sw, yMin:H*0.38, yMax:H*0.58},
+    {xMin:W*0.08, xMax:centreL-sw, yMin:H*0.6, yMax:H-padB-sh},
   ];
-  offsets.forEach(({r,c,ox,oy})=>{
-    positions.push({
-      x: padL + c*gapX + ox*W,
-      y: padT + 20 + r*gapY + oy*H
-    });
+  // Right side slots (shifted left)
+  const rightSlots=[
+    {xMin:centreR, xMax:W-sw-W*0.18, yMin:padT, yMax:H*0.35},
+    {xMin:centreR, xMax:W-sw-W*0.16, yMin:H*0.38, yMax:H*0.58},
+    {xMin:centreR, xMax:W-sw-W*0.20, yMin:H*0.6, yMax:H-padB-sh},
+  ];
+  const allSlots=[...leftSlots,...rightSlots];
+  // Shuffle slot order for randomness
+  for(let i=allSlots.length-1;i>0;i--){
+    const j=0|Math.random()*(i+1);
+    [allSlots[i],allSlots[j]]=[allSlots[j],allSlots[i]];
+  }
+  allSlots.forEach(s=>{
+    const x=s.xMin+Math.random()*(Math.max(0,s.xMax-s.xMin));
+    const y=s.yMin+Math.random()*(Math.max(0,s.yMax-s.yMin));
+    positions.push({x,y});
   });
   return positions;
 }
@@ -410,8 +439,76 @@ startRound(0);
 let resizeTimer;
 window.addEventListener('resize',()=>{
   clearTimeout(resizeTimer);
-  resizeTimer=setTimeout(()=>startRound(curRound),300);
+  resizeTimer=setTimeout(()=>{startRound(curRound);resizeRippleCanvas();},300);
 });
+
+// ===== WATER WAVE ANIMATION =====
+const waveTurb=document.getElementById('waveTurb');
+const waveTurb2=document.getElementById('waveTurb2');
+let waveT=0;
+function animateWave(){
+  waveT+=0.004;
+  // Primary large wave — slow undulation
+  const bx=0.01+Math.sin(waveT)*0.002;
+  const by=0.014+Math.cos(waveT*0.6)*0.003;
+  waveTurb.setAttribute('baseFrequency',bx+' '+by);
+  // Secondary fine ripple — gentle shimmer
+  const fx=0.02+Math.sin(waveT*1.4+1.0)*0.004;
+  const fy=0.035+Math.cos(waveT*1.0+0.5)*0.005;
+  waveTurb2.setAttribute('baseFrequency',fx+' '+fy);
+  requestAnimationFrame(animateWave);
+}
+animateWave();
+
+// ===== CANVAS RIPPLE OVERLAY =====
+const rippleCvs=document.getElementById('rippleCanvas');
+const rCtx=rippleCvs.getContext('2d');
+function resizeRippleCanvas(){
+  rippleCvs.width=window.innerWidth;
+  rippleCvs.height=window.innerHeight;
+}
+resizeRippleCanvas();
+
+let rT=0;
+function drawRipples(){
+  rT+=0.012;
+  const w=rippleCvs.width,h=rippleCvs.height;
+  rCtx.clearRect(0,0,w,h);
+
+  // Gentle concentric ripple rings
+  for(let i=0;i<6;i++){
+    const cx=w*(0.1+i*0.16)+Math.sin(rT*0.5+i*1.3)*30;
+    const cy=h*(0.15+(i%3)*0.3)+Math.cos(rT*0.4+i*0.9)*25;
+    const maxR=130+i*15;
+    for(let r=0;r<3;r++){
+      const radius=((rT*25+r*40+i*22)%maxR);
+      const alpha=0.25*(1-radius/maxR);
+      rCtx.beginPath();
+      rCtx.arc(cx,cy,radius,0,Math.PI*2);
+      rCtx.strokeStyle=`rgba(170,215,255,${alpha})`;
+      rCtx.lineWidth=1;
+      rCtx.stroke();
+    }
+  }
+
+  // Subtle horizontal caustic wave lines
+  rCtx.globalAlpha=0.08;
+  for(let y=0;y<h;y+=50){
+    rCtx.beginPath();
+    rCtx.moveTo(0,y);
+    for(let x=0;x<w;x+=10){
+      const dy=Math.sin(x*0.015+rT*1.5+y*0.008)*3+Math.sin(x*0.006+rT*0.8)*2;
+      rCtx.lineTo(x,y+dy);
+    }
+    rCtx.strokeStyle='rgba(200,235,255,0.6)';
+    rCtx.lineWidth=1;
+    rCtx.stroke();
+  }
+  rCtx.globalAlpha=1;
+
+  requestAnimationFrame(drawRipples);
+}
+drawRipples();
 </script>
 </body>
 </html>
