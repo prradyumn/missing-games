@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{width:100vw;height:100vh;overflow:hidden;font-family:'Georgia','Times New Roman',serif;background:#1a5a8a}
+
+.scene{position:fixed;inset:0;overflow:hidden}
+
+/* Background image */
+.bg{position:absolute;inset:0;background-size:cover;background-position:center;background-repeat:no-repeat;transition:opacity 1s;z-index:0}
+.bg-main{background-image:url('https://i.ibb.co/zVR70pXd/Chat-GPT-Image-Mar-17-2026-05-10-12-PM-2.png')}
+.bg-final{background-image:url('https://i.ibb.co/fbKwgT0/Chat-GPT-Image-Mar-17-2026-05-10-12-PM-2-1.png');opacity:0}
+.bg-final.show{opacity:1}
+
+/* ===== BANNER using hosted image ===== */
+.banner{
+  position:absolute;top:8px;left:50%;transform:translateX(-50%);z-index:100;
+  width:min(1080px,96vw);height:120px;
+  background:url('https://i.ibb.co/TqttYkm6/image-6.png') center/100% 100% no-repeat;
+  display:flex;align-items:center;
+  padding-left:8px;
+}
+.banner-text-area{
+  flex:1;display:flex;align-items:center;
+  padding:0 50px 0 24px;
+  height:100%;
+}
+.banner-text{
+  font-size:clamp(16px,2.5vw,22px);color:#5a4320;line-height:1.4;font-weight:600;
+}
+.banner-text strong{color:#8B6914}
+
+/* ===== STONES ===== */
+.stones-container{position:absolute;inset:0;z-index:10}
+
+.stone{
+  position:absolute;cursor:pointer;
+  width:clamp(240px,28vw,340px);
+  aspect-ratio:1.35/1;
+  transition:filter .3s;
+  animation:stoneFloat 3s ease-in-out infinite;
+}
+.stone:nth-child(2){animation-delay:-.6s}
+.stone:nth-child(3){animation-delay:-1.2s}
+.stone:nth-child(4){animation-delay:-1.8s}
+.stone:nth-child(5){animation-delay:-2.1s}
+.stone:nth-child(6){animation-delay:-.3s}
+
+.stone:hover{filter:brightness(1.12)}
+
+@keyframes stoneFloat{
+  0%,100%{transform:translateY(0)}
+  50%{transform:translateY(-10px)}
+}
+
+.stone-img-wrap{
+  width:100%;height:100%;position:relative;
+  display:flex;align-items:center;justify-content:center;
+}
+.stone-img-wrap img{
+  width:100%;height:100%;object-fit:contain;
+  filter:drop-shadow(0 8px 18px rgba(0,0,0,.45));
+  pointer-events:none;
+}
+
+.stone-text{
+  position:absolute;z-index:2;
+  font-size:clamp(18px,2.4vw,26px);font-weight:800;
+  color:#8B6914;
+  text-shadow:1px 1px 0 rgba(255,255,255,.35),-1px -1px 0 rgba(0,0,0,.06);
+  user-select:none;letter-spacing:1px;
+  top:50%;left:50%;transform:translate(-50%,-55%);
+  white-space:nowrap;
+}
+
+/* Water shadow under stone */
+.stone-shadow{
+  position:absolute;bottom:-6px;left:10%;right:10%;height:18px;
+  border-radius:50%;
+  background:radial-gradient(ellipse,rgba(0,60,120,.28) 0%,transparent 70%);
+  animation:shadowP 3s ease-in-out infinite;
+}
+.stone:nth-child(2) .stone-shadow{animation-delay:-.6s}
+.stone:nth-child(3) .stone-shadow{animation-delay:-1.2s}
+.stone:nth-child(4) .stone-shadow{animation-delay:-1.8s}
+.stone:nth-child(5) .stone-shadow{animation-delay:-2.1s}
+.stone:nth-child(6) .stone-shadow{animation-delay:-.3s}
+@keyframes shadowP{0%,100%{transform:scale(1);opacity:.65}50%{transform:scale(1.08);opacity:.35}}
+
+/* ===== GLOW EFFECTS ===== */
+/* GREEN glow - stays until stone moves */
+.stone .glow-ring{
+  position:absolute;inset:-14px;border-radius:50%;pointer-events:none;
+  opacity:0;transition:opacity .3s;
+}
+.stone.correct .glow-ring{
+  opacity:1;
+  background:radial-gradient(ellipse,rgba(0,255,100,.35) 30%,rgba(0,255,100,.12) 60%,transparent 75%);
+  animation:glowPulseG 0.8s ease-in-out 2;
+}
+@keyframes glowPulseG{0%,100%{transform:scale(.96);opacity:.7}50%{transform:scale(1.08);opacity:1}}
+
+/* RED glow - one-shot then fades */
+.stone .red-glow{
+  position:absolute;inset:-14px;border-radius:50%;pointer-events:none;
+  opacity:0;
+  background:radial-gradient(ellipse,rgba(255,50,50,.4) 25%,rgba(255,50,50,.12) 55%,transparent 72%);
+}
+.stone.wrong .red-glow{
+  animation:redFlash 1s ease-out forwards;
+}
+@keyframes redFlash{
+  0%{opacity:0;transform:scale(.9)}
+  20%{opacity:1;transform:scale(1.06)}
+  100%{opacity:0;transform:scale(1.1)}
+}
+
+.stone.correct{animation:none !important;cursor:default}
+.stone.wrong{animation:none !important;cursor:default}
+
+/* Sunk state - slightly down + translucent */
+.stone.sunk{
+  animation:none !important;
+  cursor:default;
+}
+.stone.sunk .stone-img-wrap img{opacity:.45;filter:drop-shadow(0 8px 18px rgba(0,0,0,.25)) brightness(.85)}
+.stone.sunk .stone-text{opacity:.4}
+.stone.sunk .stone-shadow{opacity:0}
+
+/* Moving to path */
+.stone.to-path{
+  animation:none !important;
+  transition:left 1s cubic-bezier(.4,0,.2,1),top 1s cubic-bezier(.4,0,.2,1) !important;
+  z-index:20 !important;
+}
+
+/* ===== OVERLAY ===== */
+.overlay{position:fixed;inset:0;z-index:200;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,.5);backdrop-filter:blur(8px);opacity:0;pointer-events:none;transition:opacity .6s}
+.overlay.show{opacity:1;pointer-events:auto}
+.overlay h1{font-size:clamp(32px,5vw,46px);color:#ffd700;margin-bottom:8px;text-shadow:0 3px 16px rgba(0,0,0,.6)}
+.overlay p{font-size:clamp(16px,2.5vw,22px);color:#e8e8e8;margin-bottom:24px;text-align:center;padding:0 20px}
+.overlay button{
+  padding:14px 42px;font-size:18px;font-weight:700;
+  background:linear-gradient(135deg,#f8b500,#fceabb);
+  border:3px solid #c8960e;border-radius:30px;color:#5a4320;cursor:pointer;
+  box-shadow:0 4px 18px rgba(0,0,0,.35);transition:transform .2s;
+  font-family:inherit;
+}
+.overlay button:hover{transform:scale(1.08)}
+</style>
+</head>
+<body>
+
+<div class="scene" id="scene">
+  <div class="bg bg-main" id="bgMain"></div>
+  <div class="bg bg-final" id="bgFinal"></div>
+
+  <!-- Banner with hosted assets -->
+  <div class="banner" id="banner">
+    <div class="banner-text-area">
+      <div class="banner-text" id="bannerText">
+        Tap the pebbles with nouns you can touch and see!
+      </div>
+    </div>
+  </div>
+
+  <!-- Stones -->
+  <div class="stones-container" id="stonesContainer"></div>
+
+  <!-- Overlay -->
+  <div class="overlay" id="overlay">
+    <h1 id="olTitle">🎉 Path Complete!</h1>
+    <p id="olText">You built the path to the gate!</p>
+    <button id="olBtn" onclick="handleOverlayBtn()">Next Round ➡️</button>
+  </div>
+</div>
+
+<script>
+const STONE_IMG='https://i.ibb.co/Z3kGFVS/Chat-GPT-Image-Mar-17-2026-02-48-10-PM-18.png';
+
+// ===== AUDIO =====
+const AC=new(window.AudioContext||window.webkitAudioContext)();
+function res(){if(AC.state==='suspended')AC.resume()}
+
+function playHappy(){
+  res();const n=AC.currentTime;
+  [[0,659],[.08,784],[.16,988],[.28,1175]].forEach(([d,f])=>{
+    const o=AC.createOscillator(),g=AC.createGain();
+    o.connect(g);g.connect(AC.destination);o.type='sine';o.frequency.value=f;
+    g.gain.setValueAtTime(.15,n+d);g.gain.exponentialRampToValueAtTime(.001,n+d+.4);
+    o.start(n+d);o.stop(n+d+.4);
+  });
+}
+function playSad(){
+  res();const n=AC.currentTime;
+  [[0,330],[.15,262],[.3,220]].forEach(([d,f])=>{
+    const o=AC.createOscillator(),g=AC.createGain();
+    o.connect(g);g.connect(AC.destination);o.type='triangle';o.frequency.value=f;
+    g.gain.setValueAtTime(.11,n+d);g.gain.exponentialRampToValueAtTime(.001,n+d+.55);
+    o.start(n+d);o.stop(n+d+.55);
+  });
+}
+function playGate(){
+  res();const n=AC.currentTime;
+  [[0,523],[.1,659],[.2,784],[.32,988],[.45,1175],[.6,1319]].forEach(([d,f])=>{
+    const o=AC.createOscillator(),g=AC.createGain();
+    o.connect(g);g.connect(AC.destination);o.type='sine';o.frequency.value=f;
+    g.gain.setValueAtTime(.13,n+d);g.gain.exponentialRampToValueAtTime(.001,n+d+.5);
+    o.start(n+d);o.stop(n+d+.5);
+  });
+}
+
+// ===== ROUNDS =====
+const rounds=[
+  {
+    instruction:"Tap the pebbles with nouns you can <strong>touch and see</strong>!",
+    words:[
+      {word:'Apple',status:true},{word:'Chair',status:true},{word:'Dog',status:true},
+      {word:'Love',status:false},{word:'Honesty',status:false},{word:'Success',status:false}
+    ]
+  },
+  {
+    instruction:"Tap the pebbles that are <strong>living things</strong>!",
+    words:[
+      {word:'Cat',status:true},{word:'Tree',status:true},{word:'Bird',status:true},
+      {word:'Rock',status:false},{word:'Cloud',status:false},{word:'River',status:false}
+    ]
+  },
+  {
+    instruction:"Tap the pebbles that are <strong>colors</strong>!",
+    words:[
+      {word:'Red',status:true},{word:'Blue',status:true},{word:'Green',status:true},
+      {word:'Fast',status:false},{word:'Tall',status:false},{word:'Soft',status:false}
+    ]
+  }
+];
+
+// ===== POSITION CALCULATION - no overlaps =====
+function getStoneSize(){
+  return Math.min(Math.max(window.innerWidth*0.14,120),170);
+}
+
+function getPositions(){
+  const W=window.innerWidth,H=window.innerHeight;
+  const sw=getStoneSize(),sh=sw/1.35;
+  const padT=100,padB=60,padL=30,padR=30;
+  // 3 rows x 2 cols layout, well spaced
+  const usableW=W-padL-padR-sw;
+  const usableH=H-padT-padB-sh;
+  const cols=3,rows=2;
+  const gapX=usableW/(cols-1);
+  const gapY=usableH/(rows-1);
+  const positions=[];
+  // Row 0: 3 stones across top area
+  // Row 1: 3 stones across bottom area
+  // Stagger for natural look
+  const offsets=[
+    {r:0,c:0,ox:0.08,oy:0.05},
+    {r:0,c:1,ox:0,oy:-0.02},
+    {r:0,c:2,ox:-0.06,oy:0.04},
+    {r:1,c:0,ox:0.05,oy:-0.03},
+    {r:1,c:1,ox:0,oy:0.02},
+    {r:1,c:2,ox:-0.04,oy:-0.04},
+  ];
+  offsets.forEach(({r,c,ox,oy})=>{
+    positions.push({
+      x: padL + c*gapX + ox*W,
+      y: padT + 20 + r*gapY + oy*H
+    });
+  });
+  return positions;
+}
+
+// Path targets - 3 stones vertically centered, leading upward
+function getPathTargets(){
+  const W=window.innerWidth,H=window.innerHeight;
+  const sw=getStoneSize();
+  const cx=W/2-sw/2;
+  const sh=sw/1.35;
+  const totalH=sh*3+16*2;
+  const startY=(H-totalH)/2;
+  return [
+    {x:cx,y:startY},
+    {x:cx,y:startY+sh+16},
+    {x:cx,y:startY+(sh+16)*2},
+  ];
+}
+
+let curRound=0,correctCount=0;
+
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=0|Math.random()*(i+1);[a[i],a[j]]=[a[j],a[i]]}return a}
+
+function startRound(r){
+  curRound=r;correctCount=0;
+  const data=rounds[r];
+  document.getElementById('bannerText').innerHTML=data.instruction;
+  document.getElementById('overlay').classList.remove('show');
+
+  // Background swap
+  document.getElementById('bgFinal').classList.remove('show');
+  document.getElementById('bgMain').style.opacity='1';
+
+  const container=document.getElementById('stonesContainer');
+  container.innerHTML='';
+  const positions=getPositions();
+  const shuffled=shuffle([...data.words]);
+
+  shuffled.forEach((item,i)=>{
+    const el=document.createElement('div');
+    el.className='stone';
+    el.style.left=positions[i].x+'px';
+    el.style.top=positions[i].y+'px';
+    el.dataset.status=item.status;
+    el.innerHTML=`
+      <div class="stone-shadow"></div>
+      <div class="glow-ring"></div>
+      <div class="red-glow"></div>
+      <div class="stone-img-wrap">
+        <img src="${STONE_IMG}" alt="stone" draggable="false">
+        <span class="stone-text">${item.word}</span>
+      </div>
+    `;
+    el.addEventListener('click',function handler(){
+      handleClick(el,item);
+    });
+    container.appendChild(el);
+  });
+}
+
+function handleClick(el,item){
+  if(el.classList.contains('correct')||el.classList.contains('sunk'))return;
+  res();
+
+  if(item.status){
+    // === CORRECT ===
+    el.classList.add('correct');
+    playHappy();
+    correctCount++;
+
+    // After green glow, move to path center
+    setTimeout(()=>{
+      el.classList.remove('correct');
+      el.classList.add('to-path');
+      const targets=getPathTargets();
+      const idx=correctCount-1;
+      if(idx<3){
+        el.style.left=targets[idx].x+'px';
+        el.style.top=targets[idx].y+'px';
+      }
+      // Check win after move animation
+      setTimeout(()=>{
+        if(correctCount>=3) finishRound();
+      },1100);
+    },900);
+
+  } else {
+    // === WRONG ===
+    el.classList.add('wrong');
+    playSad();
+
+    // Sink down a bit
+    const curTop=parseFloat(el.style.top);
+    el.style.transition='top .8s ease-in';
+    el.style.top=(curTop+30)+'px';
+
+    // After red flash animation ends (1s), remove wrong class and apply sunk state
+    setTimeout(()=>{
+      el.classList.remove('wrong');
+      el.classList.add('sunk');
+    },1050);
+
+    // Banner feedback
+    const orig=rounds[curRound].instruction;
+    document.getElementById('bannerText').innerHTML=
+      `<strong>Uh-oh!</strong> You cannot touch and see <strong>${item.word.toLowerCase()}</strong>. Try again!`;
+    setTimeout(()=>{
+      document.getElementById('bannerText').innerHTML=orig;
+    },2200);
+  }
+}
+
+function finishRound(){
+  playGate();
+  // Swap background on every path completion
+  document.getElementById('bgFinal').classList.add('show');
+  setTimeout(()=>{
+    const ov=document.getElementById('overlay');
+    if(curRound>=2){
+      document.getElementById('olTitle').textContent='🏆 Amazing! All Paths Built!';
+      document.getElementById('olText').textContent='You completed all 3 rounds! The gate is open!';
+      document.getElementById('olBtn').textContent='Play Again 🔄';
+    } else {
+      document.getElementById('olTitle').textContent='🎉 Path Complete!';
+      document.getElementById('olText').textContent=`Round ${curRound+1} done! ${curRound===1?'Final round next!':'Keep going!'}`;
+      document.getElementById('olBtn').textContent='Next Round ➡️';
+    }
+    ov.classList.add('show');
+  },1200);
+}
+
+function handleOverlayBtn(){
+  if(curRound>=2){startRound(0)}
+  else{startRound(curRound+1)}
+}
+
+// Init
+startRound(0);
+
+// Reposition on resize
+let resizeTimer;
+window.addEventListener('resize',()=>{
+  clearTimeout(resizeTimer);
+  resizeTimer=setTimeout(()=>startRound(curRound),300);
+});
+</script>
+</body>
+</html>
