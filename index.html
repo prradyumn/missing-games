@@ -194,14 +194,10 @@ function playHappy(){
     o.start(n+d);o.stop(n+d+.4);
   });
 }
-function playSad(){
-  res();const n=AC.currentTime;
-  [[0,330],[.15,262],[.3,220]].forEach(([d,f])=>{
-    const o=AC.createOscillator(),g=AC.createGain();
-    o.connect(g);g.connect(AC.destination);o.type='triangle';o.frequency.value=f;
-    g.gain.setValueAtTime(.11,n+d);g.gain.exponentialRampToValueAtTime(.001,n+d+.55);
-    o.start(n+d);o.stop(n+d+.55);
-  });
+const splashAudio=new Audio('freesound_community-splash-6213.mp3');
+function playSplash(){
+  splashAudio.currentTime=0;
+  splashAudio.play();
 }
 function playGate(){
   res();const n=AC.currentTime;
@@ -360,7 +356,7 @@ function handleClick(el,item){
   } else {
     // === WRONG ===
     el.classList.add('wrong');
-    playSad();
+    playSplash();
 
     // Sink down a bit
     const curTop=parseFloat(el.style.top);
